@@ -11,6 +11,8 @@ def get_url(sourcetype, id, id2=None, id3=None):
     return "https://refolm-hfl.appspot.com/game_schedule.jsp?leagueid={}&zengo={}&year={}".format(id, id2, id3)
   elif sourcetype == "jfl":
     return "http://www.jfl.or.jp/jfl-pc/view/s.php?a={}&f={}_spc.html".format(id, id2)
+  elif sourcetype == "fss":
+    return "http://football-system.jp/fss/pub_taikaigamelist.php?lid={}".format(id)
   return None
 
 def is_date(string):
@@ -133,4 +135,47 @@ def read_jfl_matches(a, f, year):
               })
   return content
 
-print(read_jfl_matches(1542, '2020A001', 2020))
+def read_fss_matches(lid):
+
+  url = get_url("fss", lid)
+
+  res = requests.get(url)
+  soup = BeautifulSoup(res.content, "html.parser")
+
+  content = []
+
+  target_area = soup.find(class_="game_schedule")
+  for tr_element in target_area.find_all("tr"):
+    result_date_element = tr_element.find("td", class_="match_date")
+    home_team_element = tr_element.find("td", class_="team_home")
+    away_team_element = tr_element.find("td", class_="team_away")
+    score_element = tr_element.find("td", class_="match_result")
+
+    if result_date_element and score_element:
+
+      match_date = result_date_element.text
+
+      rubbish_word_index = match_date.index(' (')
+      match_date = match_date[:rubbish_word_index].replace('\n', '').replace('\t', '')
+
+      score_link_element = score_element.find("a")
+
+      if score_link_element:
+        score_link = score_link_element.get('onclick')
+        if score_link:
+          score_link = score_link.replace("gamedetail(", "").replace(")", "")
+          score_link_list = score_link.split(',')
+          taikai_hold_id = int(score_link_list[0])
+          fed_id = int(score_link_list[1])
+          game_id = int(score_link_list[2])
+          if taikai_hold_id and fed_id and game_id:
+            content.append({
+              'match_date': match_date,
+              'taikai_hold_id': taikai_hold_id,
+              'fed_id': fed_id,
+              'game_id': game_id,
+              'source_type': "fss"
+            })
+  return content
+
+print(read_fss_matches('1GAdeYMZEHM='))
